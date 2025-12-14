@@ -1,16 +1,19 @@
-import * as dotenv from "dotenv";
-dotenv.config();
-import os from "os";
-import express from "express";
+import * as path from "path";
+import fs from "fs/promises";
 import http from "http";
-import * as path from 'path'
+import os from "os";
+
+import * as dotenv from "dotenv";
 import bodyParser from "body-parser";
 import bodyParserXml from "body-parser-xml";
+import express from "express";
 import internalIp from "internal-ip";
+
 import { getDevices } from "./getDevices";
-import { subscribe } from "./subscribe";
 import { setDevice } from "./setDevice";
-import fs from "fs/promises";
+import { subscribe } from "./subscribe";
+
+dotenv.config();
 
 const PORT = process.env.PORT || 4000;
 const HOSTNAME = os.hostname();

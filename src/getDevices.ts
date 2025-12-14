@@ -1,4 +1,4 @@
-import {Client} from 'node-ssdp'
+import { Client } from "node-ssdp";
 import fetch from "node-fetch";
 import xml2js from "xml2js";
 
