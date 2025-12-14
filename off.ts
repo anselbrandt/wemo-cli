@@ -8,7 +8,7 @@ async function main() {
   for (let device of devices) {
     const response = await setDevice({ address: device.address, state: "off" });
     console.log(device.name, response);
-    await delay(100);
+    await delay(200);
   }
 }
 

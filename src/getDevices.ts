@@ -83,9 +83,9 @@ export const getDevices = async () => {
   const devices: Device[] = [];
   for (const address of addresses) {
     const name = await ping({ address: address as string, prop: "name" });
-    await delay(100);
+    await delay(200);
     const state = await ping({ address: address as string, prop: "state" });
-    await delay(100);
+    await delay(200);
     devices.push({ name, address, state } as Device);
   }
   return devices;
