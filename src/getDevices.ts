@@ -9,10 +9,15 @@ async function discover() {
     const address = headers.LOCATION;
     devices.add(address.replace("/setup.xml", ""));
   });
-  client.search("urn:Belkin:device:controllee:1");
   const delay = (ms: number) =>
     new Promise((resolve) => setTimeout(resolve, ms));
-  await delay(3000);
+  // Send multiple search requests to catch slow-responding devices
+  client.search("urn:Belkin:device:controllee:1");
+  await delay(2000);
+  client.search("urn:Belkin:device:controllee:1");
+  await delay(2000);
+  client.search("urn:Belkin:device:controllee:1");
+  await delay(2000);
   client.stop();
   return Array.from(devices);
 }
@@ -60,6 +65,7 @@ async function ping(options: Options) {
       return value;
     }
   } catch (error) {
+    console.log("getDevices error");
     console.log(error);
   }
 }
@@ -70,16 +76,17 @@ interface Device {
   endpoint: string;
   state: boolean;
 }
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export const getDevices = async () => {
   const addresses = await discover();
-  const devices = await Promise.all(
-    addresses.map(async (address) => {
-      return Promise.resolve({
-        name: await ping({ address: address as string, prop: "name" }),
-        address: address,
-        state: await ping({ address: address as string, prop: "state" }),
-      } as Device);
-    })
-  );
+  const devices: Device[] = [];
+  for (const address of addresses) {
+    const name = await ping({ address: address as string, prop: "name" });
+    await delay(100);
+    const state = await ping({ address: address as string, prop: "state" });
+    await delay(100);
+    devices.push({ name, address, state } as Device);
+  }
   return devices;
 };
