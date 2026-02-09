@@ -7,7 +7,7 @@ const port = 3000;
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-app.post("/on", async (_req, res) => {
+app.get("/on", async (_req, res) => {
   try {
     const devices = await getDevices();
     const results: string[] = [];
@@ -24,7 +24,7 @@ app.post("/on", async (_req, res) => {
   }
 });
 
-app.post("/off", async (_req, res) => {
+app.get("/off", async (_req, res) => {
   try {
     const devices = await getDevices();
     const results: string[] = [];

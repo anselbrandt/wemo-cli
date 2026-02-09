@@ -17,15 +17,15 @@ Control Wemo smart plugs from the command line and over the web.
 
 | Route          | Method | Description                     |
 | -------------- | ------ | ------------------------------- |
-| `/on`          | POST   | Turn all devices on             |
-| `/off`         | POST   | Turn all devices off            |
+| `/on`          | GET    | Turn all devices on             |
+| `/off`         | GET    | Turn all devices off            |
 | `/status`      | GET    | Get status of all devices       |
 
 ### Usage
 
 ```bash
-curl -X POST https://homeware.anselbrandt.net/on
-curl -X POST https://homeware.anselbrandt.net/off
+curl https://homeware.anselbrandt.net/on
+curl https://homeware.anselbrandt.net/off
 curl https://homeware.anselbrandt.net/status
 ```
 
