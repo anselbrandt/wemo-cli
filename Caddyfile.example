@@ -1,0 +1,7 @@
+homeware.anselbrandt.net {
+    reverse_proxy localhost:3000
+
+    tls {
+        dns cloudflare {env.CF_API_TOKEN}
+    }
+}

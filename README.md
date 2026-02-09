@@ -1,3 +1,89 @@
+# wemo-cli
+
+Control Wemo smart plugs from the command line and over the web.
+
+## Scripts
+
+| Script      | Description                  |
+| ----------- | ---------------------------- |
+| `on.ts`     | Turn all devices on          |
+| `off.ts`    | Turn all devices off         |
+| `status.ts` | Print status of all devices  |
+| `server.ts` | Web server for remote control |
+
+## Web Server
+
+`server.ts` runs an Express server on port 3000 with three routes:
+
+| Route          | Method | Description                     |
+| -------------- | ------ | ------------------------------- |
+| `/on`          | POST   | Turn all devices on             |
+| `/off`         | POST   | Turn all devices off            |
+| `/status`      | GET    | Get status of all devices       |
+
+### Usage
+
+```bash
+curl -X POST https://homeware.anselbrandt.net/on
+curl -X POST https://homeware.anselbrandt.net/off
+curl https://homeware.anselbrandt.net/status
+```
+
+## Deployment
+
+### Crontab
+
+Scheduled on/off via cron. Edit with `crontab -e`:
+
+```crontab
+PATH=/home/ansel/.nvm/versions/node/v24.12.0/bin:/usr/bin:/bin
+
+# Turn on lights at 8:45am on weekdays
+45 8 * * 1-5 /home/ansel/dev/wemo-cli/log-errors.sh /home/ansel/.nvm/versions/node/v24.12.0/bin/tsx /home/ansel/dev/wemo-cli/on.ts >> /home/ansel/lights.log
+
+# Turn on lights at 10am on weekends
+0 10 * * 0,6 /home/ansel/dev/wemo-cli/log-errors.sh /home/ansel/.nvm/versions/node/v24.12.0/bin/tsx /home/ansel/dev/wemo-cli/on.ts >> /home/ansel/lights.log
+
+# Turn off lights at 11pm
+0 23 * * * /home/ansel/dev/wemo-cli/log-errors.sh /home/ansel/.nvm/versions/node/v24.12.0/bin/tsx /home/ansel/dev/wemo-cli/off.ts >> /home/ansel/lights.log
+```
+
+### Systemd
+
+The web server runs as a systemd service. To install:
+
+```bash
+sudo cp wemo-server.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable wemo-server
+sudo systemctl start wemo-server
+```
+
+Check status and logs:
+
+```bash
+sudo systemctl status wemo-server
+journalctl -u wemo-server -f
+```
+
+### Caddy
+
+Caddy reverse proxies to the web server. See `Caddyfile.example` for a sample config.
+
+Copy to Caddy config directory:
+
+```bash
+sudo cp Caddyfile.example /etc/caddy/Caddyfile
+```
+
+Edit `/etc/caddy/Caddyfile` and replace `{env.CF_API_TOKEN}` with your Cloudflare API token, then reload:
+
+```bash
+sudo systemctl reload caddy
+```
+
+---
+
 ## Controlling Wemo Switches Over HTTP with SOAP XML
 
 #### Perform Discovery using SSDP (Simple Service Discovery Protocol)

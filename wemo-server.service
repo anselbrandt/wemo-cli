@@ -1,0 +1,14 @@
+[Unit]
+Description=Wemo light control web server
+After=network.target
+
+[Service]
+Type=simple
+User=ansel
+WorkingDirectory=/home/ansel/dev/wemo-cli
+ExecStart=/home/ansel/.nvm/versions/node/v24.12.0/bin/tsx /home/ansel/dev/wemo-cli/server.ts
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
