@@ -7,6 +7,10 @@ const port = 3000;
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok" });
+});
+
 app.get("/on", async (_req, res) => {
   try {
     const devices = await getDevices();
