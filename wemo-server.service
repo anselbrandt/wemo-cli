@@ -6,6 +6,7 @@ After=network.target
 Type=simple
 User=ansel
 WorkingDirectory=/home/ansel/dev/wemo-cli
+Environment=PATH=/home/ansel/.nvm/versions/node/v24.12.0/bin:/usr/bin:/bin
 ExecStart=/home/ansel/.nvm/versions/node/v24.12.0/bin/tsx /home/ansel/dev/wemo-cli/server.ts
 Restart=on-failure
 RestartSec=5
