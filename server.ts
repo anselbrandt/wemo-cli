@@ -11,38 +11,25 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
-app.get("/on", async (_req, res) => {
-  try {
-    const devices = await getDevices();
-    const results: string[] = [];
-    for (const device of devices) {
-      const response = await setDevice({ address: device.address, state: "on" });
-      results.push(`${device.name}: ${response}`);
-      await delay(200);
-    }
-    console.log("ON:", results.join(", "));
-    res.json({ status: "ok", results });
-  } catch (error) {
-    console.error("ON error:", error);
-    res.status(500).json({ status: "error", message: String(error) });
+async function setAllDevices(state: "on" | "off") {
+  const devices = await getDevices();
+  const results: string[] = [];
+  for (const device of devices) {
+    const response = await setDevice({ address: device.address, state });
+    results.push(`${device.name}: ${response}`);
+    await delay(200);
   }
+  console.log(`${state.toUpperCase()}:`, results.join(", "));
+}
+
+app.get("/on", (_req, res) => {
+  res.json({ status: "ok" });
+  setAllDevices("on").catch((error) => console.error("ON error:", error));
 });
 
-app.get("/off", async (_req, res) => {
-  try {
-    const devices = await getDevices();
-    const results: string[] = [];
-    for (const device of devices) {
-      const response = await setDevice({ address: device.address, state: "off" });
-      results.push(`${device.name}: ${response}`);
-      await delay(200);
-    }
-    console.log("OFF:", results.join(", "));
-    res.json({ status: "ok", results });
-  } catch (error) {
-    console.error("OFF error:", error);
-    res.status(500).json({ status: "error", message: String(error) });
-  }
+app.get("/off", (_req, res) => {
+  res.json({ status: "ok" });
+  setAllDevices("off").catch((error) => console.error("OFF error:", error));
 });
 
 app.get("/status", async (_req, res) => {
