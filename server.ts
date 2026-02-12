@@ -32,6 +32,21 @@ app.get("/off", (_req, res) => {
   setAllDevices("off").catch((error) => console.error("OFF error:", error));
 });
 
+app.get("/piano", (_req, res) => {
+  res.json({ status: "ok" });
+  (async () => {
+    const devices = await getDevices();
+    const piano = devices.find((d) => d.name === "Piano");
+    if (!piano) {
+      console.error("PIANO error: device not found");
+      return;
+    }
+    const newState = piano.state ? "off" : "on";
+    const result = await setDevice({ address: piano.address, state: newState });
+    console.log(`PIANO: ${newState.toUpperCase()} -> ${result}`);
+  })().catch((error) => console.error("PIANO error:", error));
+});
+
 app.get("/status", async (_req, res) => {
   try {
     const devices = await getDevices();
