@@ -7,12 +7,42 @@ const port = 3000;
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Cached device list: populated on startup, refreshed on /on, /off, /status
+interface CachedDevice {
+  name: string;
+  address: string;
+  state: number;
+}
+let cachedDevices: CachedDevice[] = [];
+
+async function refreshCache() {
+  const devices = await getDevices();
+  cachedDevices = devices.map((d) => ({
+    name: d.name,
+    address: d.address,
+    state: d.state as unknown as number,
+  }));
+  console.log(
+    "CACHE:",
+    cachedDevices.map((d) => `${d.name} @ ${d.address}`).join(", ")
+  );
+  return cachedDevices;
+}
+
+// Populate cache on startup
+refreshCache().catch((error) => console.error("Initial cache error:", error));
+
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
 async function setAllDevices(state: "on" | "off") {
   const devices = await getDevices();
+  cachedDevices = devices.map((d) => ({
+    name: d.name,
+    address: d.address,
+    state: d.state as unknown as number,
+  }));
   const results: string[] = [];
   for (const device of devices) {
     const response = await setDevice({ address: device.address, state });
@@ -35,21 +65,31 @@ app.get("/off", (_req, res) => {
 app.get("/piano", (_req, res) => {
   res.json({ status: "ok" });
   (async () => {
-    const devices = await getDevices();
-    const piano = devices.find((d) => d.name === "Piano");
+    const piano = cachedDevices.find((d) => d.name === "Piano");
     if (!piano) {
-      console.error("PIANO error: device not found");
+      console.error("PIANO error: device not found in cache, refreshing...");
+      await refreshCache();
+      const retryPiano = cachedDevices.find((d) => d.name === "Piano");
+      if (!retryPiano) {
+        console.error("PIANO error: device not found after refresh");
+        return;
+      }
+      const newState = retryPiano.state ? "off" : "on";
+      const result = await setDevice({ address: retryPiano.address, state: newState });
+      console.log(`PIANO: ${newState.toUpperCase()} -> ${result}`);
       return;
     }
     const newState = piano.state ? "off" : "on";
     const result = await setDevice({ address: piano.address, state: newState });
+    // Update cached state
+    piano.state = newState === "on" ? 1 : 0;
     console.log(`PIANO: ${newState.toUpperCase()} -> ${result}`);
   })().catch((error) => console.error("PIANO error:", error));
 });
 
 app.get("/status", async (_req, res) => {
   try {
-    const devices = await getDevices();
+    const devices = await refreshCache();
     console.log("STATUS:", devices.map((d) => `${d.name}: ${d.state}`).join(", "));
     res.json({ status: "ok", devices });
   } catch (error) {
