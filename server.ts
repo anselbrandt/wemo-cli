@@ -36,15 +36,16 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
-async function setAllDevices(state: "on" | "off") {
+async function setAllDevices(state: "on" | "off", exclude: string[] = []) {
   const devices = await getDevices();
   cachedDevices = devices.map((d) => ({
     name: d.name,
     address: d.address,
     state: d.state as unknown as number,
   }));
+  const filtered = devices.filter((d) => !exclude.includes(d.name));
   const results: string[] = [];
-  for (const device of devices) {
+  for (const device of filtered) {
     const response = await setDevice({ address: device.address, state });
     results.push(`${device.name}: ${response}`);
     await delay(200);
@@ -54,7 +55,7 @@ async function setAllDevices(state: "on" | "off") {
 
 app.get("/on", (_req, res) => {
   res.json({ status: "ok" });
-  setAllDevices("on").catch((error) => console.error("ON error:", error));
+  setAllDevices("on", ["Piano"]).catch((error) => console.error("ON error:", error));
 });
 
 app.get("/off", (_req, res) => {
