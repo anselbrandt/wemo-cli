@@ -5,7 +5,8 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function main() {
   const devices = await getDevices();
-  for (let device of devices) {
+  const filtered = devices.filter((d) => d.name !== "Piano");
+  for (let device of filtered) {
     const response = await setDevice({ address: device.address, state: "on" });
     console.log(device.name, response);
     await delay(200);
