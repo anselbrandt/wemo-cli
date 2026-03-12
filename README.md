@@ -76,7 +76,7 @@ Copy to Caddy config directory:
 sudo cp Caddyfile.example /etc/caddy/Caddyfile
 ```
 
-Edit `/etc/caddy/Caddyfile` and replace `{env.CF_API_TOKEN}` with your Cloudflare API token, then reload:
+Reload Caddy:
 
 ```bash
 sudo systemctl reload caddy

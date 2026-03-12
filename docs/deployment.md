@@ -142,22 +142,13 @@ chmod +x /home/ansel/dev/wemo-cli/log-errors.sh
 
 ## 6. Install and configure Caddy
 
-Caddy provides HTTPS reverse proxying to the Express server on port 3000.
+Caddy reverse proxies to the Express server on port 3000. TLS is handled by the Cloudflare Tunnel, so Caddy serves plain HTTP.
 
 ### Install Caddy
 
 ```bash
-sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
-curl -1sLf 'https://dl.cloudflare.com/cloudflared-stable-linux-arm64.deb' -o /tmp/cloudflared.deb
-```
-
-For Caddy with Cloudflare DNS plugin (needed for TLS certificate provisioning via Cloudflare):
-
-```bash
 sudo apt install -y caddy
 ```
-
-Or install a custom build with the Cloudflare DNS module from [caddyserver.com/download](https://caddyserver.com/download).
 
 ### Configure Caddy
 
@@ -167,19 +158,15 @@ Copy the example Caddyfile:
 sudo cp /home/ansel/dev/wemo-cli/Caddyfile.example /etc/caddy/Caddyfile
 ```
 
-Edit `/etc/caddy/Caddyfile` and replace `{env.CF_API_TOKEN}` with your actual Cloudflare API token:
+The Caddyfile listens on HTTP port 8081 and proxies to the Express server:
 
 ```
-homeware.anselbrandt.net {
+http://homeware.anselbrandt.net:8081 {
     reverse_proxy localhost:3000
-
-    tls {
-        dns cloudflare "YOUR_CLOUDFLARE_API_TOKEN"
-    }
 }
 ```
 
-The `tls` block uses the Cloudflare DNS challenge for automatic HTTPS certificates. This is needed because the Pi isn't directly reachable from the internet (traffic goes through the Cloudflare Tunnel).
+No TLS configuration is needed — the Cloudflare Tunnel terminates TLS at the edge and forwards traffic to Caddy over HTTP.
 
 Reload Caddy:
 
@@ -210,9 +197,7 @@ The tunnel runs as a remotely-managed tunnel (configured in the Cloudflare dashb
 
 | Hostname                    | Service                |
 | --------------------------- | ---------------------- |
-| homeware.anselbrandt.net    | https://localhost:443  |
-
-Set **Origin Server Name** to `homeware.anselbrandt.net` in the origin configuration so cloudflared validates Caddy's TLS certificate.
+| homeware.anselbrandt.net    | http://localhost:8081  |
 
 The catch-all rule should return HTTP 404.
 
@@ -256,10 +241,10 @@ sudo systemctl status cloudflared
 ## Traffic flow
 
 ```
-Internet
+Internet (HTTPS)
   → Cloudflare CDN (homeware.anselbrandt.net)
     → Cloudflare Tunnel (cloudflared on Pi)
-      → Caddy (https://localhost:443)
+      → Caddy (http://localhost:8081)
         → Express server (http://localhost:3000)
 ```
 
@@ -304,14 +289,6 @@ tsx /home/ansel/dev/wemo-cli/on.ts
 Wemo devices use SSDP multicast on the local network. Ensure:
 - Pi and Wemo plugs are on the same network/VLAN
 - No firewall blocking UDP multicast (port 1900)
-
-### Caddy certificate issues
-
-```bash
-journalctl -u caddy -n 50
-```
-
-The Cloudflare API token needs the **Zone > DNS > Edit** permission for certificate DNS challenges.
 
 ### Cloudflare Tunnel not connecting
 
