@@ -30,6 +30,10 @@ The control path is now built to turn **all** switches on/off every run:
   serialised and spaced ≥350ms apart, eliminating the `socket hang up` drops.
 - **Timeouts + retries + verification**: each set is retried and confirmed with
   `GetBinaryState`; a stale cached IP (DHCP reuse) is detected by name check.
+- **Subnet-scan fallback** (`discover()`): when SSDP returns fewer than
+  `WEMO_MIN_DEVICES` (default `6`), the local `/24` is actively probed on the
+  common Wemo ports (49153, 49152) and any responders are merged in. This
+  reliably finds devices that SSDP missed and relocates ones that changed port.
 - **Loud failures**: `on.ts`/`off.ts` print an `Error:` line and exit non-zero
   for any switch that could not be set, so `log-errors.sh` records it.
 
@@ -54,7 +58,8 @@ discovery repopulate `devices.json`.
 | `WEMO_GAP_MS`       | `350`          | Minimum gap between requests to the same device.   |
 | `WEMO_ATTEMPTS`     | `5`            | Retry attempts per device.                         |
 | `WEMO_REGISTRY`     | `./devices.json` | Path to the persisted device registry.           |
-| `WEMO_NO_DISCOVERY` | unset          | Set to `1` to skip multicast and use only the registry (fastest, fully deterministic once all switches are known). |
+| `WEMO_MIN_DEVICES`  | `6`            | Trigger the subnet-scan fallback when SSDP finds fewer than this many devices. |
+| `WEMO_NO_DISCOVERY` | unset          | Set to `1` to skip discovery (SSDP + scan) and use only the registry (fastest, fully deterministic once all switches are known). |
 
 > **DHCP reservations are in place** for all 6 switches, so cached IPs never go
 > stale. Keep discovery **on** for cron, though: a Wemo can come back on a
@@ -88,17 +93,21 @@ curl https://homeware.anselbrandt.net/status
 Scheduled on/off via cron. Edit with `crontab -e`:
 
 ```crontab
-PATH=/home/ansel/.nvm/versions/node/v24.12.0/bin:/usr/bin:/bin
+PATH=/home/ansel/.nvm/versions/node/v24.14.0/bin:/usr/bin:/bin
 
 # Turn on lights at 8:45am on weekdays
-45 8 * * 1-5 /home/ansel/dev/wemo-cli/log-errors.sh /home/ansel/.nvm/versions/node/v24.12.0/bin/tsx /home/ansel/dev/wemo-cli/on.ts >> /home/ansel/lights.log
+45 8 * * 1-5 /home/ansel/dev/wemo-cli/log-errors.sh /home/ansel/.nvm/versions/node/v24.14.0/bin/tsx /home/ansel/dev/wemo-cli/on.ts >> /home/ansel/lights.log
 
 # Turn on lights at 10am on weekends
-0 10 * * 0,6 /home/ansel/dev/wemo-cli/log-errors.sh /home/ansel/.nvm/versions/node/v24.12.0/bin/tsx /home/ansel/dev/wemo-cli/on.ts >> /home/ansel/lights.log
+0 10 * * 0,6 /home/ansel/dev/wemo-cli/log-errors.sh /home/ansel/.nvm/versions/node/v24.14.0/bin/tsx /home/ansel/dev/wemo-cli/on.ts >> /home/ansel/lights.log
 
-# Turn off lights at 11pm
-0 23 * * * /home/ansel/dev/wemo-cli/log-errors.sh /home/ansel/.nvm/versions/node/v24.12.0/bin/tsx /home/ansel/dev/wemo-cli/off.ts >> /home/ansel/lights.log
+# Turn off lights at midnight
+0 0 * * * /home/ansel/dev/wemo-cli/log-errors.sh /home/ansel/.nvm/versions/node/v24.14.0/bin/tsx /home/ansel/dev/wemo-cli/off.ts >> /home/ansel/lights.log
 ```
+
+> The `PATH` and the `tsx` path above must point at the **installed** node
+> version (`ls ~/.nvm/versions/node`). Update them after a node upgrade or the
+> scheduled jobs will silently fail with `env: node: No such file or directory`.
 
 ### Systemd
 
