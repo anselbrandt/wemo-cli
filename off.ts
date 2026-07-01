@@ -1,15 +1,11 @@
-import { getDevices } from "./src/getDevices";
-import { setDevice } from "./src/setDevice";
-
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+import { setAllDevices, reportAndExit } from "./src/setAllDevices";
 
 async function main() {
-  const devices = await getDevices();
-  for (let device of devices) {
-    const response = await setDevice({ address: device.address, state: "off" });
-    console.log(device.name, response);
-    await delay(200);
-  }
+  const result = await setAllDevices("off");
+  reportAndExit(result);
 }
 
-main().catch((error) => console.log(error));
+main().catch((error) => {
+  console.error("Error: off.ts crashed:", error);
+  process.exitCode = 1;
+});

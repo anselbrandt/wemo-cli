@@ -11,6 +11,58 @@ Control Wemo smart plugs from the command line and over the web.
 | `status.ts` | Print status of all devices  |
 | `server.ts` | Web server for remote control |
 
+## Reliability
+
+Wemo switches are on WiFi and their tiny embedded HTTP servers handle one
+connection at a time, so two requests sent back-to-back get the second reset
+(`socket hang up` — measured ~50% loss with no gap, 0% loss at a ~300ms gap).
+SSDP discovery over multicast WiFi is also lossy, so any single discovery pass
+typically finds only a random subset of the switches. Together these caused the
+cron job to silently toggle only some of the switches.
+
+The control path is now built to turn **all** switches on/off every run:
+
+- **Persistent registry** (`devices.json`): every switch seen is remembered by
+  name → last-known address. Each run still discovers to refresh addresses, but
+  it commands **every known device** — falling back to the cached address for any
+  switch that misses a discovery pass.
+- **Request pacing** (`src/pace.ts`): all requests to a given device are
+  serialised and spaced ≥350ms apart, eliminating the `socket hang up` drops.
+- **Timeouts + retries + verification**: each set is retried and confirmed with
+  `GetBinaryState`; a stale cached IP (DHCP reuse) is detected by name check.
+- **Loud failures**: `on.ts`/`off.ts` print an `Error:` line and exit non-zero
+  for any switch that could not be set, so `log-errors.sh` records it.
+
+### First-time setup (seed the registry)
+
+The IPs are DHCP-reserved on the router, so the registry can be seeded once from
+the checked-in `devices.seed.json` (all 6 switches):
+
+```bash
+cp devices.seed.json devices.json
+```
+
+`devices.json` is the live registry (gitignored — it's machine state that
+discovery keeps fresh). If you ever add/replace a switch, update
+`devices.seed.json`, or just run `npx tsx status.ts` a few times and let
+discovery repopulate `devices.json`.
+
+### Tuning (environment variables)
+
+| Variable            | Default        | Purpose                                            |
+| ------------------- | -------------- | -------------------------------------------------- |
+| `WEMO_GAP_MS`       | `350`          | Minimum gap between requests to the same device.   |
+| `WEMO_ATTEMPTS`     | `5`            | Retry attempts per device.                         |
+| `WEMO_REGISTRY`     | `./devices.json` | Path to the persisted device registry.           |
+| `WEMO_NO_DISCOVERY` | unset          | Set to `1` to skip multicast and use only the registry (fastest, fully deterministic once all switches are known). |
+
+> **DHCP reservations are in place** for all 6 switches, so cached IPs never go
+> stale. Keep discovery **on** for cron, though: a Wemo can come back on a
+> different *port* (e.g. `49152`/`49154`) after a power cycle, and a normal run's
+> discovery pass relocates it and rewrites `devices.json` automatically.
+> `WEMO_NO_DISCOVERY=1` is fastest and fully deterministic, but skips that
+> self-healing — use it only if you don't mind re-seeding after a switch reboots.
+
 ## Web Server
 
 `server.ts` runs an Express server on port 3000 with three routes:
