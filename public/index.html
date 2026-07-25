@@ -105,18 +105,49 @@
         opacity: 0.55;
         cursor: default;
       }
-      #status {
+      button.secondary {
+        color: var(--fg);
+        background: transparent;
+        border: 1px solid var(--line);
+      }
+      .now {
+        display: flex;
+        gap: 0.6rem;
+        margin: 0 0 1.5rem;
+      }
+      .now button {
+        flex: 1;
+      }
+      .status {
         font-size: 0.875rem;
         color: var(--muted);
+        min-height: 1.5rem;
       }
-      #status.error {
+      .status.error {
         color: #c2402a;
+      }
+      h2 {
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+        margin: 0 0 0.6rem;
       }
     </style>
   </head>
   <body>
     <main>
-      <h1>Light schedule</h1>
+      <h1>Lights</h1>
+
+      <h2>Right now</h2>
+      <div class="now">
+        <button id="lights-on" class="secondary">Lights on</button>
+        <button id="lights-out" class="secondary">Lights out</button>
+      </div>
+      <p class="status" id="now-status"></p>
+
+      <h2>Schedule</h2>
       <p class="hint">
         Times are the local clock time on that calendar day. Leave a field blank
         for no change that day. To stay up late Friday, set Saturday&rsquo;s
@@ -131,7 +162,7 @@
 
       <div class="actions">
         <button id="save" disabled>Save</button>
-        <span id="status">Loading&hellip;</span>
+        <span class="status" id="status">Loading&hellip;</span>
       </div>
     </main>
 
@@ -140,6 +171,9 @@
       const rows = document.getElementById("rows");
       const saveButton = document.getElementById("save");
       const status = document.getElementById("status");
+      const nowStatus = document.getElementById("now-status");
+      const onButton = document.getElementById("lights-on");
+      const outButton = document.getElementById("lights-out");
       const inputs = {};
 
       for (const day of DAYS) {
@@ -160,9 +194,9 @@
         rows.append(row);
       }
 
-      function setStatus(message, isError) {
-        status.textContent = message;
-        status.className = isError ? "error" : "";
+      function setStatus(element, message, isError) {
+        element.textContent = message;
+        element.className = isError ? "status error" : "status";
       }
 
       async function load() {
@@ -176,9 +210,9 @@
             }
           }
           saveButton.disabled = false;
-          setStatus("");
+          setStatus(status, "");
         } catch (error) {
-          setStatus("Could not load schedule: " + error.message, true);
+          setStatus(status, "Could not load schedule: " + error.message, true);
         }
       }
 
@@ -191,7 +225,7 @@
           };
         }
         saveButton.disabled = true;
-        setStatus("Saving…");
+        setStatus(status, "Saving…");
         try {
           const response = await fetch("/schedule", {
             method: "POST",
@@ -200,15 +234,36 @@
           });
           const result = await response.json().catch(() => ({}));
           if (!response.ok) throw new Error(result.message || "HTTP " + response.status);
-          setStatus("Saved");
+          setStatus(status, "Saved");
         } catch (error) {
-          setStatus("Save failed: " + error.message, true);
+          setStatus(status, "Save failed: " + error.message, true);
         } finally {
           saveButton.disabled = false;
         }
       }
 
+      // /on and /off answer immediately and then drive the switches in the
+      // background (a full sweep is paced, so it takes up to a minute). There's
+      // nothing to await, so report "sent" rather than pretending it's done.
+      async function switchAll(action, label) {
+        onButton.disabled = true;
+        outButton.disabled = true;
+        setStatus(nowStatus, label + "…");
+        try {
+          const response = await fetch("/" + action);
+          if (!response.ok) throw new Error("HTTP " + response.status);
+          setStatus(nowStatus, label + " — sent, switches follow within a minute");
+        } catch (error) {
+          setStatus(nowStatus, label + " failed: " + error.message, true);
+        } finally {
+          onButton.disabled = false;
+          outButton.disabled = false;
+        }
+      }
+
       saveButton.addEventListener("click", save);
+      onButton.addEventListener("click", () => switchAll("on", "Lights on"));
+      outButton.addEventListener("click", () => switchAll("off", "Lights out"));
       load();
     </script>
   </body>
