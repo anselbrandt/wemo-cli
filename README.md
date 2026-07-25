@@ -60,6 +60,8 @@ discovery repopulate `devices.json`.
 | `WEMO_REGISTRY`     | `./devices.json` | Path to the persisted device registry.           |
 | `WEMO_MIN_DEVICES`  | `6`            | Trigger the subnet-scan fallback when SSDP finds fewer than this many devices. |
 | `WEMO_NO_DISCOVERY` | unset          | Set to `1` to skip discovery (SSDP + scan) and use only the registry (fastest, fully deterministic once all switches are known). |
+| `WEMO_SCHEDULE`     | `./schedule.json` | Path to the persisted on/off schedule.          |
+| `PORT`              | `3000`         | Port the web server listens on.                    |
 
 > **DHCP reservations are in place** for all 6 switches, so cached IPs never go
 > stale. Keep discovery **on** for cron, though: a Wemo can come back on a
@@ -70,13 +72,16 @@ discovery repopulate `devices.json`.
 
 ## Web Server
 
-`server.ts` runs an Express server on port 3000 with three routes:
+`server.ts` runs an Express server on port 3000:
 
 | Route          | Method | Description                     |
 | -------------- | ------ | ------------------------------- |
+| `/`            | GET    | Schedule editor UI              |
 | `/on`          | GET    | Turn all devices on             |
 | `/off`         | GET    | Turn all devices off            |
 | `/status`      | GET    | Get status of all devices       |
+| `/schedule`    | GET    | Read the current schedule       |
+| `/schedule`    | POST   | Replace the schedule            |
 
 ### Usage
 
@@ -86,28 +91,58 @@ curl https://homeware.anselbrandt.net/off
 curl https://homeware.anselbrandt.net/status
 ```
 
-## Deployment
+## Schedule
 
-### Crontab
+On/off times are configured per weekday from the web UI at
+<https://homeware.anselbrandt.net/> — no SSH, no crontab. The server itself
+applies them (`src/scheduler.ts`), checking every 30s, so a saved change takes
+effect immediately.
 
-Scheduled on/off via cron. Edit with `crontab -e`:
+Times are **literal local clock times on the named calendar day**. Saturday's
+`off` at `01:00` fires at 1am Saturday *morning*, not Saturday night — the same
+semantics the cron jobs had. To stay up late on a Friday, set **Saturday's** off
+time. A blank field means "no change that day".
 
-```crontab
-PATH=/home/ansel/.nvm/versions/node/v24.14.0/bin:/usr/bin:/bin
+The schedule persists to `schedule.json` (gitignored — machine state, like
+`devices.json`). It's a plain file if you'd rather edit it directly:
 
-# Turn on lights at 8:45am on weekdays
-45 8 * * 1-5 /home/ansel/dev/wemo-cli/log-errors.sh /home/ansel/.nvm/versions/node/v24.14.0/bin/tsx /home/ansel/dev/wemo-cli/on.ts >> /home/ansel/lights.log
-
-# Turn on lights at 10am on weekends
-0 10 * * 0,6 /home/ansel/dev/wemo-cli/log-errors.sh /home/ansel/.nvm/versions/node/v24.14.0/bin/tsx /home/ansel/dev/wemo-cli/on.ts >> /home/ansel/lights.log
-
-# Turn off lights at midnight
-0 0 * * * /home/ansel/dev/wemo-cli/log-errors.sh /home/ansel/.nvm/versions/node/v24.14.0/bin/tsx /home/ansel/dev/wemo-cli/off.ts >> /home/ansel/lights.log
+```json
+{
+  "Mon": { "on": "08:45", "off": "00:00" },
+  "Sat": { "on": "10:00", "off": null }
+}
 ```
 
-> The `PATH` and the `tsx` path above must point at the **installed** node
-> version (`ls ~/.nvm/versions/node`). Update them after a node upgrade or the
-> scheduled jobs will silently fail with `env: node: No such file or directory`.
+`null` (or `""`) means no event. When the file is absent the built-in defaults
+apply — Mon–Fri on at 08:45, Sat/Sun on at 10:00, off at 00:00 daily — which are
+the times the old crontab used. `POST /schedule` validates every field and
+rejects the whole request with `400` rather than persisting a partial or
+malformed schedule.
+
+As with the cron jobs, the **Piano is excluded from `on`** and only ever turned
+off.
+
+## Deployment
+
+### Scheduling (no longer cron)
+
+Scheduled on/off is handled **in-process by `wemo-server`** — see
+[Schedule](#schedule). There must be **no crontab entries** for `on.ts`/`off.ts`:
+cron and the in-process scheduler would both fire and every event would run
+twice. `crontab -l` should show no wemo lines.
+
+`on.ts` and `off.ts` remain useful for manual one-off runs:
+
+```bash
+npx tsx on.ts
+npx tsx off.ts
+```
+
+Failures now land in the service journal rather than `~/lights.log`:
+
+```bash
+journalctl -u wemo-server | grep -iE 'error|failed'
+```
 
 ### Systemd
 

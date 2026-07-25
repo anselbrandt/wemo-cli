@@ -90,55 +90,34 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
-## 5. Set up cron jobs
+## 5. Scheduling
 
-The cron jobs run `on.ts` and `off.ts` on a schedule to automatically turn lights on and off.
+> **There is no cron setup any more.** Scheduling used to live in `ansel`'s
+> crontab; it now runs inside the `wemo-server` service and is configured from
+> the web UI at the site root. If you are upgrading an older install, **delete
+> the wemo lines from `crontab -e`** — leaving them means cron *and* the
+> in-process scheduler both fire and every event runs twice.
 
-A helper script `log-errors.sh` wraps the commands to capture only error output with timestamps.
+Nothing to install: `src/scheduler.ts` starts with the server, checks the
+schedule every 30s, and applies it in local time (so the Pi's timezone must be
+right — see `timedatectl`). Times are stored in `schedule.json` next to
+`devices.json` and are editable at `/` or via `GET`/`POST /schedule`. See the
+[Schedule section of the README](../README.md#schedule) for the semantics.
 
-Edit your crontab:
-
-```bash
-crontab -e
-```
-
-Add the following (adjust the nvm Node.js path if needed):
-
-```crontab
-PATH=/home/ansel/.nvm/versions/node/v24.12.0/bin:/usr/bin:/bin
-
-# Turn on lights at 8:45am on weekdays
-45 8 * * 1-5 /home/ansel/dev/wemo-cli/log-errors.sh /home/ansel/.nvm/versions/node/v24.12.0/bin/tsx /home/ansel/dev/wemo-cli/on.ts >> /home/ansel/lights.log
-
-# Turn on lights at 10am on weekends
-0 10 * * 0,6 /home/ansel/dev/wemo-cli/log-errors.sh /home/ansel/.nvm/versions/node/v24.12.0/bin/tsx /home/ansel/dev/wemo-cli/on.ts >> /home/ansel/lights.log
-
-# Turn off lights at 11pm
-0 23 * * * /home/ansel/dev/wemo-cli/log-errors.sh /home/ansel/.nvm/versions/node/v24.12.0/bin/tsx /home/ansel/dev/wemo-cli/off.ts >> /home/ansel/lights.log
-```
-
-### log-errors.sh
-
-This script is included in the repo. It runs the given command and only logs lines containing "Error", prefixed with a timestamp:
+Verify no stale cron entries remain:
 
 ```bash
-#!/bin/bash
-"$@" 2>&1 | grep Error | while read line; do
-    echo "$(date '+%Y-%m-%d %H:%M:%S') $line"
-done
+crontab -l
 ```
 
-Make sure it's executable:
+`on.ts` and `off.ts` are still there for manual runs, and `log-errors.sh` still
+wraps a command to log only its error lines with timestamps — but the scheduled
+path no longer uses either, so failures appear in the journal instead of
+`~/lights.log`:
 
 ```bash
-chmod +x /home/ansel/dev/wemo-cli/log-errors.sh
+journalctl -u wemo-server | grep -iE 'error|failed'
 ```
-
-### Cron notes
-
-- The `PATH` line at the top is required because cron doesn't source your shell profile, so nvm-installed Node.js won't be on the path otherwise.
-- Full absolute paths are used for `tsx` and the scripts for the same reason.
-- Logs append to `~/lights.log`. Check this file to debug cron issues.
 
 ## 6. Install and configure Caddy
 
@@ -257,7 +236,9 @@ npm install
 sudo systemctl restart wemo-server
 ```
 
-Cron jobs use `tsx` to run TypeScript directly, so they pick up changes from the working directory on the next scheduled run — no restart needed.
+The restart is required for scheduler and server changes, since both now live in
+the long-running service. `schedule.json` and `devices.json` are gitignored, so a
+pull never clobbers your schedule or the device registry.
 
 ## Troubleshooting
 
@@ -271,18 +252,24 @@ Common issues:
 - Wrong Node.js path in the service file after an nvm upgrade
 - Port 3000 already in use
 
-### Cron jobs not running
+### Lights not switching on schedule
 
 ```bash
-# Check cron logs
-grep CRON /var/log/syslog
+# Is the scheduler running at all? Expect "Scheduler started" at boot.
+journalctl -u wemo-server | grep -iE 'scheduler|schedule|error|failed'
 
-# Check error log
-cat ~/lights.log
+# What does the server think the schedule is?
+curl -s localhost:3000/schedule
 
-# Test manually
+# Is the clock/timezone right? Times are applied in LOCAL time.
+timedatectl
+
+# Test the control path manually
 tsx /home/ansel/dev/wemo-cli/on.ts
 ```
+
+If an event fires **twice**, stale cron entries are still present — check
+`crontab -l` and remove any `on.ts`/`off.ts` lines.
 
 ### Devices not discovered
 

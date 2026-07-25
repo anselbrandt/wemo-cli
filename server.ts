@@ -1,11 +1,18 @@
+import path from "path";
 import express from "express";
 import { setAllDevices } from "./src/setAllDevices";
 import { getState, getName, discover } from "./src/getDevices";
 import { setDevice } from "./src/setDevice";
 import { loadRegistry, saveRegistry } from "./src/registry";
+import { loadSchedule, saveSchedule, parseSchedule } from "./src/schedule";
+import { startScheduler } from "./src/scheduler";
 
 const app = express();
-const port = 3000;
+const port = Number(process.env.PORT) || 3000;
+
+app.use(express.json());
+// Serves the schedule UI at "/". Caddy already reverse-proxies "/" here.
+app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
@@ -78,6 +85,35 @@ app.get("/status", async (_req, res) => {
   }
 });
 
+app.get("/schedule", async (_req, res) => {
+  try {
+    res.json(await loadSchedule());
+  } catch (error) {
+    console.error("SCHEDULE read error:", error);
+    res.status(500).json({ status: "error", message: String(error) });
+  }
+});
+
+app.post("/schedule", async (req, res) => {
+  const schedule = parseSchedule(req.body);
+  if (!schedule) {
+    res.status(400).json({
+      status: "error",
+      message: 'Expected {"Mon":{"on":"HH:MM","off":"HH:MM"},...}; use null to clear',
+    });
+    return;
+  }
+  try {
+    await saveSchedule(schedule);
+    console.log("SCHEDULE saved:", JSON.stringify(schedule));
+    res.json({ status: "ok", schedule });
+  } catch (error) {
+    console.error("SCHEDULE write error:", error);
+    res.status(500).json({ status: "error", message: String(error) });
+  }
+});
+
 app.listen(port, () => {
   console.log(`Wemo server listening on port ${port}`);
+  startScheduler();
 });
