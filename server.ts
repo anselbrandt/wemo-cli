@@ -20,7 +20,7 @@ app.get("/health", (_req, res) => {
 
 app.get("/on", (_req, res) => {
   res.json({ status: "ok" });
-  setAllDevices("on", { exclude: ["Piano"] })
+  setAllDevices("on")
     .then((r) =>
       console.log(
         `ON: ${r.succeeded.length} ok` +

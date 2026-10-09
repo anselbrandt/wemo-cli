@@ -119,8 +119,7 @@ the times the old crontab used. `POST /schedule` validates every field and
 rejects the whole request with `400` rather than persisting a partial or
 malformed schedule.
 
-As with the cron jobs, the **Piano is excluded from `on`** and only ever turned
-off.
+Every event switches all discovered devices, the Piano included.
 
 ## Deployment
 

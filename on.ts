@@ -1,7 +1,7 @@
 import { setAllDevices, reportAndExit } from "./src/setAllDevices";
 
 async function main() {
-  const result = await setAllDevices("on", { exclude: ["Piano"] });
+  const result = await setAllDevices("on");
   reportAndExit(result);
 }
 

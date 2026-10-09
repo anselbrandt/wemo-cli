@@ -32,12 +32,7 @@ function pad(value: number): string {
 }
 
 async function fire(action: Action): Promise<void> {
-  // Same options as on.ts/off.ts and the /on, /off handlers: the Piano is left
-  // out of the "on" sweep and only ever turned off.
-  const result =
-    action === "on"
-      ? await setAllDevices("on", { exclude: ["Piano"] })
-      : await setAllDevices("off");
+  const result = await setAllDevices(action);
   console.log(
     `${action.toUpperCase()}: ${result.succeeded.length} ok` +
       (result.failed.length ? `, failed: ${result.failed.join(", ")}` : "")
